@@ -1,7 +1,25 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import ContributionGrid from './ContributionGrid';
+import { getTwitterProfileImage } from '../utils/twitterUtils';
+import { getTierProgress, getTierClass } from '../utils/tierSystem';
+import { getMaskedValue } from '../utils/privacyUtils';
 
 const ProfileModal = ({ user, onClose }) => {
   const modalRef = useRef(null);
+  const [profileImage, setProfileImage] = useState(null);
+
+  // Fetch Twitter profile image when user changes
+  useEffect(() => {
+    if (user && user.twitter && user.twitter !== 'NaN') {
+      getTwitterProfileImage(user.twitter)
+        .then(imageUrl => {
+          setProfileImage(imageUrl);
+        })
+        .catch(error => {
+          console.error('Error fetching profile image:', error);
+        });
+    }
+  }, [user]);
 
   // Format BITS with commas
   const formatNumber = (num) => {
@@ -43,27 +61,21 @@ const ProfileModal = ({ user, onClose }) => {
     };
   }, [modalRef, onClose]);
 
-  // Get tier threshold for progress calculation
-  const getTierThreshold = (tier) => {
-    const thresholds = {
-      "Bronze": { current: 0, next: 1000 },
-      "Silver": { current: 1000, next: 10000 },
-      "Gold": { current: 10000, next: 50000 },
-      "Platinum": { current: 50000, next: 100000 }
+  // Get tier information
+  const tierInfo = getTierProgress(user);
+  const tierClass = getTierClass(user.tier || 'Genesis Explorer');
+  
+  // Get Robit's description for each tier
+  const getRobitQuote = (tier) => {
+    const quotes = {
+      'Quantum Pathfinder': "Beep boop! You've navigated the quantum realms of Metis with extraordinary skill! As my top navigators, you've helped chart the future of blockchain technology.",
+      'Chrono Navigator': "Robit is buffering with excitement... Your timeline contributions have stabilized future-state Metis protocols! You're literally coding tomorrow's solutions today!",
+      'Nebula Ranger': "Scanning... confirmation complete! Your engineering expertise has kept our Metis systems running at optimal efficiency!",
+      'Stellar Voyager': "Pattern recognized! Your voyage through the Metis blockchain has contributed valuable data to our mission!",
+      'Genesis Explorer': "Initial scan complete! You've taken your first steps into the vast Metis universe! Every cosmic voyage begins with a single transaction."
     };
     
-    return thresholds[tier] || thresholds["Bronze"];
-  };
-  
-  // Calculate progress percentage to next tier
-  const calculateProgress = () => {
-    const tier = user['Preliminary Tier'] || 'Bronze';
-    const totalBits = user['Total BITS'] || 0;
-    const { current, next } = getTierThreshold(tier);
-    
-    if (tier === 'Platinum') return 100;
-    
-    return Math.min(((totalBits - current) / (next - current)) * 100, 100);
+    return quotes[tier] || quotes['Genesis Explorer'];
   };
   
   // Get initials for avatar
@@ -77,49 +89,77 @@ const ProfileModal = ({ user, onClose }) => {
     return (words[0][0] + words[words.length - 1][0]).toUpperCase();
   };
   
-  // Get social platforms the user has connected
+  // Get social platforms the user has connected with privacy protection
   const getPlatforms = () => {
     const platforms = [];
     
     if (user.twitter && user.twitter !== "NaN") {
-      platforms.push({ name: "Twitter", icon: "🐦", handle: user.twitter });
+      platforms.push({ 
+        name: "Twitter", 
+        icon: "🐦", 
+        handle: user.twitter,
+        type: 'twitter' 
+      });
     }
     
     if (user.telegram && user.telegram !== "NaN") {
-      platforms.push({ name: "Telegram", icon: "✈️", handle: user.telegram });
+      platforms.push({ 
+        name: "Telegram", 
+        icon: "✈️", 
+        handle: getMaskedValue(user.telegram, 'telegram'),
+        type: 'telegram'
+      });
     }
     
     if (user.discord && user.discord !== "NaN") {
-      platforms.push({ name: "Discord", icon: "💬", handle: user.discord });
+      platforms.push({ 
+        name: "Discord", 
+        icon: "💬", 
+        handle: getMaskedValue(user.discord, 'discord'),
+        type: 'discord'
+      });
     }
     
     if (user.email && user.email !== "NaN") {
-      platforms.push({ name: "Email", icon: "📧", handle: user.email });
+      platforms.push({ 
+        name: "Email", 
+        icon: "📧", 
+        handle: getMaskedValue(user.email, 'email'),
+        type: 'email'
+      });
     }
     
     if (user['Email Whitelist'] && user['Email Whitelist'] !== "NaN") {
-      platforms.push({ name: "Email", icon: "📧", handle: user['Email Whitelist'] });
+      platforms.push({ 
+        name: "Email", 
+        icon: "📧", 
+        handle: getMaskedValue(user['Email Whitelist'], 'email'),
+        type: 'email'
+      });
     }
     
     if (user.web3 && user.web3 !== "NaN") {
-      platforms.push({ name: "Web3", icon: "🔗", handle: user.web3 });
+      platforms.push({ 
+        name: "Web3", 
+        icon: "🔗", 
+        handle: getMaskedValue(user.web3, 'web3'),
+        type: 'web3'
+      });
     }
     
     if (user['Whitelisted Wallet Address'] && user['Whitelisted Wallet Address'] !== "NaN") {
       platforms.push({ 
         name: "Wallet", 
         icon: "💰", 
-        handle: `${user['Whitelisted Wallet Address'].substring(0, 6)}...${user['Whitelisted Wallet Address'].substring(user['Whitelisted Wallet Address'].length - 4)}` 
+        handle: getMaskedValue(user['Whitelisted Wallet Address'], 'wallet'),
+        type: 'wallet'
       });
     }
     
     return platforms;
   };
 
-  const tier = user['Preliminary Tier'] || 'Bronze';
   const totalBits = user['Total BITS'] || 0;
-  const { current, next } = getTierThreshold(tier);
-  const progress = calculateProgress();
   const platforms = getPlatforms();
 
   const username = user['Entry Id']?.split('::')[0] || 'User';
@@ -131,32 +171,70 @@ const ProfileModal = ({ user, onClose }) => {
         
         {/* Header */}
         <div className="profile-modal-header">
-          <div className="profile-modal-avatar">
-            {getInitials(user['Entry Id'])}
+          <div className={`profile-modal-avatar ${tierClass}`}>
+            {profileImage ? (
+              <img 
+                src={profileImage} 
+                alt={`${username}'s profile`} 
+                className="profile-modal-avatar-img" 
+              />
+            ) : (
+              getInitials(user['Entry Id'])
+            )}
           </div>
           <div className="profile-modal-user-info">
             <h2 className="profile-modal-username">{username}</h2>
             <div className="profile-modal-badges">
-              <span className="profile-modal-tier">{tier}</span>
               <span className="profile-modal-rank">Rank #{user.rank || '—'}</span>
+              <span className={`profile-modal-tier ${tierClass}`}>{user.tier || 'Genesis Explorer'}</span>
             </div>
           </div>
         </div>
         
+        {/* Add Metis Reward Section if applicable */}
+        {user.metisReward > 0 && (
+          <div className="profile-modal-section profile-modal-metis-reward">
+            <div className="reward-header">
+                <img 
+                src="/robit-avatar.png" 
+                alt="Robit with rewards" 
+                className="robit-reward-icon"
+              />
+              <h3 className="profile-modal-section-title">Metis Reward</h3>
+            </div>
+            <div className={`profile-modal-metis-amount ${tierClass}`}>
+              <div className="profile-modal-metis-icon">🪙</div>
+              <div className="profile-modal-metis-value">{user.metisReward.toFixed(2)} METIS</div>
+            </div>
+            <div className="robit-reward-message">
+              "Future alpha detected! Your contributions have earned you METIS tokens!"
+            </div>
+          </div>
+        )}
+        
         {/* Progress Section */}
         <div className="profile-modal-section">
-          <h3 className="profile-modal-section-title">Tier Progress</h3>
+          <h3 className="profile-modal-section-title">Tier Status</h3>
           <div className="profile-modal-progress">
             <div className="profile-modal-progress-bar">
               <div 
-                className="profile-modal-progress-fill" 
-                style={{ width: `${progress}%` }}
+                className={`profile-modal-progress-fill ${tierClass}`}
+                style={{ width: `${tierInfo.progress}%` }}
               ></div>
             </div>
             <div className="profile-modal-progress-stats">
-              <span>Current: {formatNumber(totalBits)} BITS</span>
-              {tier !== 'Platinum' && <span>Next Tier: {formatNumber(next)} BITS</span>}
-              {tier === 'Platinum' && <span>Max Tier Reached!</span>}
+              <span>Current Tier: <span className={tierClass}>{user.tier || 'Genesis Explorer'}</span></span>
+              {tierInfo.nextTier && (
+                <span>Next Tier: {tierInfo.nextTier}</span>
+              )}
+            </div>
+            <div className="profile-modal-tier-description">
+              <img 
+                src="/robit-avatar.png" 
+                alt="Robit" 
+                className="robit-icon"
+              />
+              <span className="robit-quote">{getRobitQuote(user.tier)}</span>
             </div>
           </div>
         </div>
@@ -184,23 +262,8 @@ const ProfileModal = ({ user, onClose }) => {
           </div>
         </div>
         
-        {/* Engagement Section */}
-        <div className="profile-modal-section">
-          <h3 className="profile-modal-section-title">Engagement Pattern</h3>
-          <div className="profile-modal-engagement">
-            <div className="profile-modal-engagement-badge">
-              {user['Engagement Pattern'] || 'Contributor'}
-            </div>
-            <div className="profile-modal-engagement-description">
-              {user['Engagement Pattern'] === 'Burst Contributor' && 'Makes many contributions in short periods of time'}
-              {user['Engagement Pattern'] === 'Consistent Contributor' && 'Makes regular contributions over time'}
-              {user['Engagement Pattern'] === 'Occasional Specialist' && 'Makes fewer but valuable contributions'}
-              {!user['Engagement Pattern'] && 'Regular community participant'}
-            </div>
-          </div>
-        </div>
         
-        {/* Profiles Section */}
+        {/* Profiles Section with privacy protection */}
         {platforms.length > 0 && (
           <div className="profile-modal-section">
             <h3 className="profile-modal-section-title">Connected Profiles</h3>
@@ -210,10 +273,15 @@ const ProfileModal = ({ user, onClose }) => {
                   <div className="profile-modal-platform-icon">{platform.icon}</div>
                   <div className="profile-modal-platform-details">
                     <div className="profile-modal-platform-name">{platform.name}</div>
-                    <div className="profile-modal-platform-handle">{platform.handle}</div>
+                    <div className={`profile-modal-platform-handle ${platform.type}-type ${platform.type !== 'twitter' ? 'masked' : ''}`}>
+                      {platform.handle}
+                    </div>
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="profile-modal-privacy-notice">
+              Some personal information is masked for privacy protection.
             </div>
           </div>
         )}
@@ -241,16 +309,13 @@ const ProfileModal = ({ user, onClose }) => {
           </div>
         </div>
         
-        {/* Join & Last Active Section */}
-        <div className="profile-modal-section profile-modal-dates">
-          <div className="profile-modal-date">
-            <div className="profile-modal-date-label">First Activity:</div>
-            <div className="profile-modal-date-value">{user['First Contribution Date'] || user['Date'] || '—'}</div>
-          </div>
-          <div className="profile-modal-date">
-            <div className="profile-modal-date-label">Last Activity:</div>
-            <div className="profile-modal-date-value">{user['Last Contribution Date'] || user['Last Action'] || '—'}</div>
-          </div>
+        {/* Contribution Grid Section */}
+        <div className="profile-modal-section">
+          <h3 className="profile-modal-section-title">Contribution Activity</h3>
+          <ContributionGrid 
+            userId={user['Entry Id']}
+            contributionData={user.contributionHistory || {}}
+          />
         </div>
       </div>
     </div>

@@ -3,33 +3,34 @@ import data from './recognition-data.json'
 import './App.css'
 import ProfileModal from './components/ProfileModal'
 import Pagination from './components/Pagination'
+import VoyageOverviewModal from './components/VoyageOverviewModal'
+import { processContributions } from './utils/processContributions'
+import { getBulkTwitterProfileImages } from './utils/twitterUtils'
+import { assignTiers, getTierProgress, getTierClass } from './utils/tierSystem'
 
 function App() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showOverview, setShowOverview] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
+  const [profileImages, setProfileImages] = useState({});
   const usersPerPage = 50;
 
   useEffect(() => {
-    // Fix the data structure and sort by BITS
+    // Process the data
     const processedUsers = [...data].map((user, index) => {
-      // Fix tier names based on the numeric values
-      const tierMap = {
-        "1": "Bronze",
-        "2": "Silver", 
-        "3": "Gold",
-        "4": "Platinum"
-      };
-      
       // Ensure we're using the right Total BITS field (it might be BITS_x)
       const totalBits = user['Total BITS'] || user['Total BITS_x'] || 0;
+      
+      // Process contribution history
+      const contributionHistory = processContributions(data, user['Entry Id']);
       
       return {
         ...user,
         'Total BITS': totalBits,
-        'Preliminary Tier': user['Preliminary Tier'] ? tierMap[user['Preliminary Tier'].toString()] || "Bronze" : "Bronze",
+        contributionHistory
       };
     });
     
@@ -44,8 +45,27 @@ function App() {
       rank: index + 1
     }));
     
-    setUsers(rankedUsers);
+    // Apply the new tier system
+    const tieredUsers = assignTiers(rankedUsers);
+    
+    setUsers(tieredUsers);
     setLoading(false);
+    
+    // Collect Twitter handles for bulk fetching
+    const twitterHandles = sortedUsers
+      .filter(user => user.twitter && user.twitter !== 'NaN')
+      .map(user => user.twitter);
+    
+    // Fetch Twitter profile images in bulk
+    if (twitterHandles.length > 0) {
+      getBulkTwitterProfileImages(twitterHandles)
+        .then(images => {
+          setProfileImages(images);
+        })
+        .catch(error => {
+          console.error('Error fetching Twitter profile images:', error);
+        });
+    }
   }, []);
 
   // Calculate total pages
@@ -78,29 +98,9 @@ function App() {
     return (words[0][0] + words[words.length - 1][0]).toUpperCase();
   };
 
-  // Function to calculate tier progress percentage
-  const getTierProgress = (user) => {
-    const tierThresholds = {
-      "Bronze": 1000,
-      "Silver": 10000,
-      "Gold": 50000,
-      "Platinum": 100000
-    };
-    
-    const currentTier = user['Preliminary Tier'] || 'Bronze';
-    const nextTier = currentTier === 'Bronze' ? 'Silver' : 
-                     currentTier === 'Silver' ? 'Gold' : 
-                     currentTier === 'Gold' ? 'Platinum' : 'Platinum';
-    
-    if (currentTier === 'Platinum') return 100;
-    
-    const currentThreshold = tierThresholds[currentTier] || 0;
-    const nextThreshold = tierThresholds[nextTier] || 100000;
-    const bits = user['Total BITS'] || 0;
-    const progress = ((bits - currentThreshold) / 
-                     (nextThreshold - currentThreshold)) * 100;
-    
-    return Math.min(Math.max(progress, 0), 100);
+  // Function to get tier progress information
+  const getTierProgressInfo = (user) => {
+    return getTierProgress(user);
   };
 
   // Function to format numbers with commas
@@ -111,6 +111,7 @@ function App() {
 
   // Handle user row click - open the modal
   const handleUserClick = (user) => {
+    console.log('Selected user contributions:', user.contributionHistory);
     setSelectedUser(user);
     setShowModal(true);
   };
@@ -123,35 +124,70 @@ function App() {
   return (
     <div className="recognition-widget-root">
       <div className="recognition-leaderboard">
-        <div className="recognition-leaderboard-title">
-          Recognition Leaderboard
-          <span className="recognition-leaderboard-count">
-            {users.length} Total Users
-          </span>
+        <div className="recognition-leaderboard-header">
+          <img 
+            src="/robit-avatar.png" 
+            alt="Robit - Metis Voyage Guide" 
+            className="robit-mascot"
+          />
+          <div className="recognition-leaderboard-title-container">
+            <div className="recognition-leaderboard-title">
+              Recognition Leaderboard
+            </div>
+            <div className="robit-message">
+              "Beep boop! I've identified our top Metis Voyagers!"
+            </div>
+            <span className="recognition-leaderboard-count">
+              {users.length} Total Contributors
+            </span>
+            <button 
+              className="voyage-overview-button"
+              onClick={() => setShowOverview(true)}
+            >
+              <span>Voyage Analytics</span>
+              <img src="/robit-avatar.png" alt="Robit" className="robit-button-icon" />
+            </button>
+          </div>
         </div>
         
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px 0' }}>Loading...</div>
+          <div className="loading-container">
+            <img 
+              src="/robit-avatar.png" 
+              alt="Robit loading" 
+              className="robit-loading"
+            />
+            <div>Robit is analyzing Metis Voyage data...</div>
+          </div>
         ) : (
           <>
             {currentUsers.map((user, index) => {
               const actualRank = currentPage * usersPerPage + index + 1;
+              const tierInfo = getTierProgressInfo(user);
+              const tierClass = getTierClass(user.tier);
+              
               return (
                 <div 
                   key={index} 
-                  className={`recognition-user-row ${actualRank === 4 ? 'current-user-row' : ''}`}
+                  className={`recognition-user-row ${actualRank === 4 ? 'current-user-row' : ''} ${tierClass}`}
                   onClick={() => handleUserClick(user)}
                 >
                   <div className="recognition-rank">{actualRank}</div>
-                  <div className="recognition-avatar">
-                    {getInitials(user['Entry Id'])}
+                  <div className={`recognition-avatar ${tierClass}`}>
+                    {user.twitter && profileImages[user.twitter] ? (
+                      <img 
+                        src={profileImages[user.twitter]} 
+                        alt={`${user['Entry Id'].split('::')[0]}'s profile`} 
+                        className="recognition-avatar-img"
+                      />
+                    ) : (
+                      getInitials(user['Entry Id'])
+                    )}
                   </div>
                   <div className="recognition-user-info">
                     <div className="recognition-user-name">
                       {user['Entry Id'].split('::')[0]}
-                      <span className="recognition-tier-badge">
-                        {user['Preliminary Tier']}
-                      </span>
+                      <span className={`recognition-user-tier ${tierClass}`}>{user.tier}</span>
                     </div>
                     <div className="recognition-metrics">
                       <span className="recognition-metric">
@@ -166,11 +202,19 @@ function App() {
                         <span className="icon">👥</span>
                         {formatNumber(user['Total Referrals'] || 0)} Referrals
                       </span>
+                      
+                      {/* Display Metis reward if applicable */}
+                      {user.metisReward > 0 && (
+                        <span className="recognition-metric recognition-metis">
+                          <span className="icon">🪙</span>
+                          <span>{user.metisReward.toFixed(2)} METIS</span>
+                        </span>
+                      )}
                     </div>
                     <div className="recognition-progress-bar">
                       <div 
-                        className="recognition-progress-bar-fill" 
-                        style={{ width: `${getTierProgress(user)}%` }}
+                        className={`recognition-progress-bar-fill ${tierClass}`}
+                        style={{ width: `${tierInfo.progress}%` }}
                       ></div>
                     </div>
                   </div>
@@ -190,11 +234,18 @@ function App() {
         )}
       </div>
       
-      {/* Modal */}
+      {/* User Profile Modal */}
       {showModal && selectedUser && (
         <ProfileModal 
           user={selectedUser} 
           onClose={closeModal} 
+        />
+      )}
+      
+      {/* Voyage Overview Modal */}
+      {showOverview && (
+        <VoyageOverviewModal 
+          onClose={() => setShowOverview(false)} 
         />
       )}
     </div>
