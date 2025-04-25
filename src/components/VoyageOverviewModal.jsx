@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import '../styles/VoyageOverviewModal.css';
 import GlobalParticipation from './GlobalParticipation';
+import FeedbackShowcase from './FeedbackShowcase';
+import { useEffect, useRef, useState } from 'react';
+import { useCallback } from 'react';
+
 
 // Voyage data object with all metrics
 const voyageData = {
@@ -45,6 +49,15 @@ const formatNumber = (num) => {
 const VoyageOverviewModal = ({ onClose }) => {
   const modalRef = useRef(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [feedbackCsv, setFeedbackCsv] = useState(null);
+
+  // Load the feedback CSV on demand
+  const loadFeedbackCsv = useCallback(() => {
+    fetch('/RecognitionFeedback.csv')
+      .then(res => res.text())
+      .then(setFeedbackCsv)
+      .catch(() => setFeedbackCsv(''));
+  }, []);
 
   // Handle ESC key press
   useEffect(() => {
@@ -139,6 +152,15 @@ const VoyageOverviewModal = ({ onClose }) => {
             onClick={() => setActiveTab('global')}
           >
             Global 🌎
+          </button>
+          <button
+            className={`voyage-tab ${activeTab === 'feedback' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('feedback');
+              if (!feedbackCsv) loadFeedbackCsv();
+            }}
+          >
+            Feedback & Suggestions
           </button>
         </div>
         
@@ -452,6 +474,16 @@ const VoyageOverviewModal = ({ onClose }) => {
           {activeTab === 'global' && (
             <div className="voyage-tab-content">
               <GlobalParticipation onClose={() => setActiveTab('overview')} />
+            </div>
+          )}
+
+          {/* Feedback & Suggestions Tab */}
+          {activeTab === 'feedback' && (
+            <div className="voyage-tab-content">
+              <FeedbackShowcase
+                csvText={feedbackCsv}
+                onClose={() => setActiveTab('overview')}
+              />
             </div>
           )}
         </div>

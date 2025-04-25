@@ -143,25 +143,18 @@ const continents = {
   'Oceania': ["Australia", "New Zealand"]
 };
 
-// Dummy count data - in a real app, this would come from your backend
-const getRandomCount = () => Math.floor(Math.random() * 400) + 50;
-countryData.forEach(country => {
-  country.count = getRandomCount();
-});
+/**
+ * NOTE: All fake/dummy count data removed.
+ * This component now only displays the list of participating countries and their flags.
+ */
 
 const GlobalParticipation = ({ onClose }) => {
   const [activeContinent, setActiveContinent] = useState('all');
-  
-  // Calculate total count of contributors
-  const totalContributors = countryData.reduce((sum, country) => sum + country.count, 0);
   
   // Filter countries based on selected continent
   const filteredCountries = activeContinent === 'all' 
     ? countryData 
     : countryData.filter(country => continents[activeContinent]?.includes(country.name));
-    
-  // Find top 5 countries by contribution count
-  const topCountries = [...countryData].sort((a, b) => b.count - a.count).slice(0, 5);
 
   return (
     <div className="global-participation-overlay">
@@ -172,31 +165,9 @@ const GlobalParticipation = ({ onClose }) => {
           <h2>Global Participation</h2>
           <div className="global-subtitle">
             <img src="/robit-avatar.png" alt="Robit" className="global-robit" />
-            <p>Metis Voyage has seen participation from <span className="highlight">{countryData.length} countries</span> across the globe!</p>
-          </div>
-          
-          <div className="global-summary">
-            <div className="global-total">
-              <div className="global-earth-icon">🌍</div>
-              <div className="global-total-text">
-                <div className="global-total-count">{totalContributors.toLocaleString()}</div>
-                <div className="global-total-label">Total Contributors Worldwide</div>
-              </div>
-            </div>
-            
-            <div className="global-top-countries">
-              <h3>Top Contributing Countries</h3>
-              <div className="global-top-list">
-                {topCountries.map((country, index) => (
-                  <div key={country.name} className="global-top-country">
-                    <div className="global-top-position">{index + 1}</div>
-                    <div className="global-top-flag">{country.flag}</div>
-                    <div className="global-top-name">{country.name}</div>
-                    <div className="global-top-count">{country.count.toLocaleString()}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <p>
+              Metis Voyage has seen participation from <span className="highlight">{countryData.length} countries</span> across the globe!
+            </p>
           </div>
         </div>
         
@@ -223,13 +194,15 @@ const GlobalParticipation = ({ onClose }) => {
             <div key={country.name} className="global-country-card">
               <div className="global-country-flag">{country.flag}</div>
               <div className="global-country-name">{country.name}</div>
-              <div className="global-country-count">{country.count.toLocaleString()}</div>
             </div>
           ))}
         </div>
         
         <div className="global-footer">
-          <p>"We're building a truly global ecosystem together!" - Robit</p>
+          <p>
+            <span role="img" aria-label="globe">🌍</span> 
+            <span className="highlight">Global participation</span> is what makes this community special!
+          </p>
         </div>
       </div>
     </div>
