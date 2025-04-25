@@ -203,13 +203,8 @@ function App() {
                         {formatNumber(user['Total Referrals'] || 0)} Referrals
                       </span>
                       
-                      {/* Display Metis reward if applicable */}
-                      {user.metisReward > 0 && (
-                        <span className="recognition-metric recognition-metis">
-                          <span className="icon">🪙</span>
-                          <span>{user.metisReward.toFixed(2)} METIS</span>
-                        </span>
-                      )}
+                      {/* Metis reward display removed as requested */}
+                      
                     </div>
                     <div className="recognition-progress-bar">
                       <div 
