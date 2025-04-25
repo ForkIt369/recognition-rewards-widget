@@ -29,28 +29,49 @@ function parseCSV(text) {
   });
 }
 
+const FEEDBACK_FIELDS = [
+  { key: "Voyage Feedback", label: "Feedback", icon: "📝" },
+  { key: "Voyage Suggestions", label: "Suggestions", icon: "💡" },
+  { key: "Metis Reward Request", label: "Reward Request", icon: "🎁" },
+  { key: "Future Hyperion Voyage Hype Level?", label: "Hype Level", icon: "🚀" }
+];
+
 const FeedbackShowcase = ({ csvText, onClose }) => {
   // Memoize parsing for performance
-  const feedbacks = useMemo(() => {
+  const feedbackEntries = useMemo(() => {
     if (!csvText) return [];
     const rows = parseCSV(csvText);
-    // Use the "Share your individual contribution!" column
-    return rows
-      .map(row => row["Share your individual contribution!"] || "")
-      .map(str => str.trim())
-      .filter(str =>
-        str.length > 10 &&
-        !["!", "Yes", "no", "ok", "a", "X", "1", "top", "good", "nice", "99", "99,9", "99.9", "test"].includes(str.toLowerCase())
-      );
+    // Group by Entry Id, collect all fields
+    const byId = {};
+    rows.forEach(row => {
+      const id = row["Entry Id"] || row["entry id"] || row["ID"] || "";
+      if (!id) return;
+      if (!byId[id]) byId[id] = { id, fields: {} };
+      FEEDBACK_FIELDS.forEach(f => {
+        const val = (row[f.key] || "").trim();
+        if (val && val.length > 2 && !["!", "yes", "no", "ok", "a", "x", "1", "top", "good", "nice", "test"].includes(val.toLowerCase())) {
+          byId[id].fields[f.key] = val;
+        }
+      });
+    });
+    // Only keep entries with at least one non-empty field
+    return Object.values(byId).filter(entry => Object.keys(entry.fields).length > 0);
   }, [csvText]);
 
-  // Pick the best (longest, most thoughtful) feedbacks
+  // Pick the best (most complete, longest) feedbacks
   const bestFeedbacks = useMemo(() => {
-    // Sort by length, then pick top 12
-    return [...feedbacks]
-      .sort((a, b) => b.length - a.length)
+    // Sort by number of fields, then by total length of all fields
+    return [...feedbackEntries]
+      .sort((a, b) => {
+        const aFields = Object.values(a.fields).join(" ");
+        const bFields = Object.values(b.fields).join(" ");
+        if (Object.keys(b.fields).length !== Object.keys(a.fields).length) {
+          return Object.keys(b.fields).length - Object.keys(a.fields).length;
+        }
+        return bFields.length - aFields.length;
+      })
       .slice(0, 12);
-  }, [feedbacks]);
+  }, [feedbackEntries]);
 
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -85,9 +106,17 @@ const FeedbackShowcase = ({ csvText, onClose }) => {
           ) : (
             <div>
               <div className="global-country-card" style={{ minHeight: 120, marginBottom: 16 }}>
-                <div style={{ fontSize: 18, fontStyle: "italic", color: "#00bfff" }}>
-                  “{bestFeedbacks[activeIndex]}”
-                </div>
+                {FEEDBACK_FIELDS.map(f =>
+                  bestFeedbacks[activeIndex].fields[f.key] ? (
+                    <div key={f.key} style={{ marginBottom: 8 }}>
+                      <span style={{ fontSize: 20, marginRight: 6 }}>{f.icon}</span>
+                      <span style={{ fontWeight: 600, color: "#00bfff" }}>{f.label}:</span>
+                      <span style={{ marginLeft: 6, fontStyle: "italic" }}>
+                        {bestFeedbacks[activeIndex].fields[f.key]}
+                      </span>
+                    </div>
+                  ) : null
+                )}
               </div>
               <div style={{ textAlign: "center", marginBottom: 8 }}>
                 {bestFeedbacks.map((_, idx) => (
