@@ -4,9 +4,19 @@ import { getTwitterProfileImage } from '../utils/twitterUtils';
 import { getTierProgress, getTierClass } from '../utils/tierSystem';
 import { getMaskedValue } from '../utils/privacyUtils';
 
+// Dynamically import feedback map
+let feedbackMapPromise = null;
+function getFeedbackMap() {
+  if (!feedbackMapPromise) {
+    feedbackMapPromise = import('../feedbackMap.json').then(mod => mod.default || mod);
+  }
+  return feedbackMapPromise;
+}
+
 const ProfileModal = ({ user, onClose }) => {
   const modalRef = useRef(null);
   const [profileImage, setProfileImage] = useState(null);
+  const [feedbackData, setFeedbackData] = useState(null);
 
   // Fetch Twitter profile image when user changes
   useEffect(() => {
@@ -19,6 +29,21 @@ const ProfileModal = ({ user, onClose }) => {
           console.error('Error fetching profile image:', error);
         });
     }
+  }, [user]);
+
+  // Fetch feedback/request data for this user
+  useEffect(() => {
+    let isMounted = true;
+    getFeedbackMap().then(map => {
+      if (!isMounted) return;
+      const entryId = user['Entry Id'];
+      if (entryId && map[entryId]) {
+        setFeedbackData(map[entryId]);
+      } else {
+        setFeedbackData(null);
+      }
+    });
+    return () => { isMounted = false; };
   }, [user]);
 
   // Format BITS with commas
@@ -190,25 +215,41 @@ const ProfileModal = ({ user, onClose }) => {
             </div>
           </div>
         </div>
-        
-        {/* Add Metis Reward Section if applicable */}
-        {user.metisReward > 0 && (
-          <div className="profile-modal-section profile-modal-metis-reward">
+
+        {/* Metis Contributor Requested Section */}
+        {feedbackData && feedbackData.metisRequest && feedbackData.metisRequest.trim() && (
+          <div className="profile-modal-section profile-modal-metis-request">
             <div className="reward-header">
-                <img 
+              <img 
                 src="/robit-avatar.png" 
-                alt="Robit with rewards" 
+                alt="Robit with request" 
                 className="robit-reward-icon"
               />
-              <h3 className="profile-modal-section-title">Metis Reward</h3>
+              <h3 className="profile-modal-section-title">Metis Contributor Requested</h3>
             </div>
-            <div className={`profile-modal-metis-amount ${tierClass}`}>
-              <div className="profile-modal-metis-icon">🪙</div>
-              <div className="profile-modal-metis-value">{user.metisReward.toFixed(2)} METIS</div>
+            <div className="profile-modal-metis-request-desc">
+              This is what the Metis contributor requested:
             </div>
-            <div className="robit-reward-message">
-              "Future alpha detected! Your contributions have earned you METIS tokens!"
+            <div className="profile-modal-metis-request-text">
+              {feedbackData.metisRequest}
             </div>
+          </div>
+        )}
+
+        {/* Feedback & Suggestions Section */}
+        {feedbackData && ((feedbackData.feedback && feedbackData.feedback.trim()) || (feedbackData.suggestions && feedbackData.suggestions.trim())) && (
+          <div className="profile-modal-section profile-modal-feedback">
+            <h3 className="profile-modal-section-title">Feedback & Suggestions</h3>
+            {feedbackData.feedback && feedbackData.feedback.trim() && (
+              <div className="profile-modal-feedback-text">
+                <strong>Feedback:</strong> {feedbackData.feedback}
+              </div>
+            )}
+            {feedbackData.suggestions && feedbackData.suggestions.trim() && (
+              <div className="profile-modal-suggestions-text">
+                <strong>Suggestions:</strong> {feedbackData.suggestions}
+              </div>
+            )}
           </div>
         )}
         
