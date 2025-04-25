@@ -1,10 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import '../styles/VoyageOverviewModal.css';
 import GlobalParticipation from './GlobalParticipation';
 import FeedbackShowcase from './FeedbackShowcase';
-import { useEffect, useRef, useState } from 'react';
-import { useCallback } from 'react';
-
 
 // Voyage data object with all metrics
 const voyageData = {
