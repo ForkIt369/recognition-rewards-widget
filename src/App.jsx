@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import data from './recognition-data.json'
 import './App.css'
+import './styles/BotAnalysisDashboard.css'
 import ProfileModal from './components/ProfileModal'
 import Pagination from './components/Pagination'
 import VoyageOverviewModal from './components/VoyageOverviewModal'
+import BotAnalysisDashboard from './components/BotAnalysisDashboard'
 import { processContributions } from './utils/processContributions'
 import { getBulkTwitterProfileImages } from './utils/twitterUtils'
 import { assignTiers, getTierProgress, getTierClass } from './utils/tierSystem'
@@ -16,6 +18,7 @@ function App() {
   const [showOverview, setShowOverview] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [profileImages, setProfileImages] = useState({});
+  const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard' or 'botAnalysis'
   const usersPerPage = 50;
 
   useEffect(() => {
@@ -121,8 +124,18 @@ function App() {
     setShowModal(false);
   };
 
-  return (
-    <div className="recognition-widget-root">
+  const renderActiveTab = () => {
+    switch (activeTab) {
+      case 'botAnalysis':
+        return <BotAnalysisDashboard users={users} />;
+      case 'leaderboard':
+      default:
+        return renderLeaderboard();
+    }
+  };
+  
+  const renderLeaderboard = () => {
+    return (
       <div className="recognition-leaderboard">
         <div className="recognition-leaderboard-header">
           <img 
@@ -228,6 +241,30 @@ function App() {
           </>
         )}
       </div>
+      
+    );
+  };
+
+  return (
+    <div className="recognition-widget-root">
+      {/* Tab Navigation */}
+      <div className="tab-navigation">
+        <button 
+          className={`tab-button ${activeTab === 'leaderboard' ? 'active' : ''}`}
+          onClick={() => setActiveTab('leaderboard')}
+        >
+          Recognition Leaderboard
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'botAnalysis' ? 'active' : ''}`}
+          onClick={() => setActiveTab('botAnalysis')}
+        >
+          Bot Analysis
+        </button>
+      </div>
+      
+      {/* Render active tab content */}
+      {renderActiveTab()}
       
       {/* User Profile Modal */}
       {showModal && selectedUser && (
